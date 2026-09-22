@@ -58,30 +58,37 @@ jobs:
         run: echo "Backend and frontend checks passed"
 
   deploy:
-    if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '#skip') }}
+    if: ${{ github.event_name == 'push' && !contains(toJson(github.event.commits), '#skip') }}
     needs: [build_and_test]
     runs-on: ubuntu-latest
     env:
       RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
     steps:
       - name: Trigger deployment
-        if: ${{ env.RENDER_HOOK != '' }}
-        run: curl --fail --silent --show-error --retry 3 "$RENDER_HOOK"
+        run: |
+          if [ -n "$RENDER_HOOK" ]; then
+            curl --fail --silent --show-error --retry 3 "$RENDER_HOOK"
+          else
+            echo "RENDER_DEPLOY_HOOK is not set, skipping deployment trigger."
+          fi
 
   notify_success:
     needs: [deploy]
-    if: ${{ success() && github.event_name == 'push' && !contains(github.event.head_commit.message, '#skip') }}
+    if: ${{ github.event_name == 'push' && !contains(toJson(github.event.commits), '#skip') }}
     runs-on: ubuntu-latest
     env:
       DISCORD_URL: ${{ secrets.DISCORD_WEBHOOK }}
     steps:
       - name: Notify Deployment Success
-        if: ${{ env.DISCORD_URL != '' }}
         run: |
+          if [ -z "$DISCORD_URL" ]; then
+            echo "Warning: DISCORD_WEBHOOK secret is missing or empty on GitHub Settings. Skipping Discord notification."
+            exit 0
+          fi
           curl -H "Content-Type: application/json" \
-          -X POST \
-          -d '{"content": "Successfully deployed custom pipeline app to Render!"}' \
-          "$DISCORD_URL"
+            -X POST \
+            -d '{"content": "Successfully deployed custom pipeline app to Render!"}' \
+            "$DISCORD_URL"
 
   notify_failure:
     needs: [backend_test, frontend_test, build_and_test, deploy]
@@ -91,15 +98,18 @@ jobs:
       DISCORD_URL: ${{ secrets.DISCORD_WEBHOOK }}
     steps:
       - name: Notify Build Failure
-        if: ${{ env.DISCORD_URL != '' }}
         run: |
-          curl -H "Content-Type: application/json" \
-          -X POST \
-          -d '{"content": "Pipeline failed! Commit: ${{ github.sha }} by ${{ github.actor }}"}' \
-          "$DISCORD_URL"
+          if [ -n "$DISCORD_URL" ]; then
+            curl -H "Content-Type: application/json" \
+              -X POST \
+              -d "{\"content\": \"Pipeline failed! Commit: ${{ github.sha }} by ${{ github.actor }}\"}" \
+              "$DISCORD_URL"
+          else
+            echo "DISCORD_WEBHOOK secret is missing. Skipping failure notification."
+          fi
 
   tag_release:
-    if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '#skip') }}
+    if: ${{ github.event_name == 'push' && !contains(toJson(github.event.commits), '#skip') }}
     needs: [deploy]
     runs-on: ubuntu-latest
     permissions:
@@ -111,7 +121,6 @@ jobs:
         with:
           fetch-depth: 0
       - name: Bump version and push tag
-        if: ${{ env.RENDER_HOOK != '' }}
         uses: anothrNick/github-tag-action@1.75.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

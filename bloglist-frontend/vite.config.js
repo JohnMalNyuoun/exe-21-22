@@ -18,6 +18,6 @@ export default defineConfig({
     environment: 'jsdom',
   },
   preview: {
-    allowedHosts: ['fullstack-own-pipeline.onrender.com'],
+    allowedHosts: ['exe-21-22.onrender.com'],
   },
 })
