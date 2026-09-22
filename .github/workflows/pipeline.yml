@@ -58,23 +58,25 @@ jobs:
         run: echo "Backend and frontend checks passed"
 
   deploy:
+    if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
     needs: [build_and_test]
     runs-on: ubuntu-latest
     env:
       RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
     steps:
       - name: Trigger deployment
-        if: ${{ github.event_name == 'push' && env.RENDER_HOOK != '' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
+        if: ${{ env.RENDER_HOOK != '' }}
         run: curl --fail --silent --show-error --retry 3 "$RENDER_HOOK"
 
   notify_success:
     needs: [deploy]
+    if: ${{ success() && github.event_name == 'push' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
     runs-on: ubuntu-latest
     env:
       DISCORD_URL: ${{ secrets.DISCORD_WEBHOOK }}
     steps:
       - name: Notify Deployment Success
-        if: ${{ success() && github.event_name == 'push' && env.DISCORD_URL != '' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
+        if: ${{ env.DISCORD_URL != '' }}
         run: |
           curl -H "Content-Type: application/json" \
           -X POST \
@@ -97,6 +99,7 @@ jobs:
           "$DISCORD_URL"
 
   tag_release:
+    if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
     needs: [deploy]
     runs-on: ubuntu-latest
     permissions:
@@ -105,8 +108,10 @@ jobs:
       RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for tagging action to read history and determine previous tag
       - name: Bump version and push tag
-        if: ${{ github.event_name == 'push' && env.RENDER_HOOK != '' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
+        if: ${{ env.RENDER_HOOK != '' }}
         uses: anothrNick/github-tag-action@1.75.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
