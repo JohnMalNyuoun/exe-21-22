@@ -69,7 +69,7 @@ jobs:
           if [ -n "$RENDER_HOOK" ]; then
             curl --fail --silent --show-error --retry 3 "$RENDER_HOOK"
           else
-            echo "RENDER_DEPLOY_HOOK is not set, skipping actual HTTP trigger"
+            echo "RENDER_DEPLOY_HOOK is not set, skipping deployment trigger."
           fi
 
   notify_success:
@@ -82,8 +82,8 @@ jobs:
       - name: Notify Deployment Success
         run: |
           if [ -z "$DISCORD_URL" ]; then
-            echo "Error: DISCORD_WEBHOOK secret is missing or empty on GitHub Settings!"
-            exit 1
+            echo "Warning: DISCORD_WEBHOOK secret is missing or empty on GitHub Settings. Skipping Discord notification."
+            exit 0
           fi
           curl -H "Content-Type: application/json" \
             -X POST \
@@ -102,8 +102,10 @@ jobs:
           if [ -n "$DISCORD_URL" ]; then
             curl -H "Content-Type: application/json" \
               -X POST \
-              -d '{"content": "Pipeline failed! Commit: ${{ github.sha }} by ${{ github.actor }}"}' \
+              -d "{\"content\": \"Pipeline failed! Commit: ${{ github.sha }} by ${{ github.actor }}\"}" \
               "$DISCORD_URL"
+          else
+            echo "DISCORD_WEBHOOK secret is missing. Skipping failure notification."
           fi
 
   tag_release:
