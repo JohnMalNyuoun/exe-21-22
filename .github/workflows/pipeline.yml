@@ -58,7 +58,7 @@ jobs:
         run: echo "Backend and frontend checks passed"
 
   deploy:
-    if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
+    if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '#skip') }}
     needs: [build_and_test]
     runs-on: ubuntu-latest
     env:
@@ -70,7 +70,7 @@ jobs:
 
   notify_success:
     needs: [deploy]
-    if: ${{ success() && github.event_name == 'push' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
+    if: ${{ success() && github.event_name == 'push' && !contains(github.event.head_commit.message, '#skip') }}
     runs-on: ubuntu-latest
     env:
       DISCORD_URL: ${{ secrets.DISCORD_WEBHOOK }}
@@ -99,7 +99,7 @@ jobs:
           "$DISCORD_URL"
 
   tag_release:
-    if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
+    if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '#skip') }}
     needs: [deploy]
     runs-on: ubuntu-latest
     permissions:
@@ -109,7 +109,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Required for tagging action to read history and determine previous tag
+          fetch-depth: 0
       - name: Bump version and push tag
         if: ${{ env.RENDER_HOOK != '' }}
         uses: anothrNick/github-tag-action@1.75.0
